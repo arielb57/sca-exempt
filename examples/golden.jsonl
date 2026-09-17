@@ -1,0 +1,51 @@
+# Low-value (Art. 16): single-amount boundary
+{"id":"g01","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":1000,"channel":"remote"}
+{"id":"g02","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":2000,"channel":"remote"}
+{"id":"g03","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":3000,"channel":"remote"}
+{"id":"g04","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":3001,"channel":"remote"}
+# Low-value: cumulative EUR 100 boundary; a failed SCA does not reset
+{"id":"g05","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":2999,"channel":"remote"}
+{"id":"g06","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":2999,"channel":"remote"}
+{"id":"g07","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":2999,"channel":"remote"}
+{"id":"g08","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":1003,"channel":"remote"}
+{"id":"g09","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":100,"channel":"remote","scaOutcome":"failure"}
+{"id":"g10","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":100,"channel":"remote"}
+# Low-value: 5th vs 6th consecutive payment
+{"id":"g11","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":100,"channel":"remote"}
+{"id":"g12","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":100,"channel":"remote"}
+{"id":"g13","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":100,"channel":"remote"}
+{"id":"g14","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":100,"channel":"remote"}
+{"id":"g15","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":100,"channel":"remote"}
+{"id":"g16","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":100,"channel":"remote"}
+# Contactless (Art. 11): EUR 50 single and EUR 150 cumulative boundaries
+{"id":"g17","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":5000,"channel":"contactless"}
+{"id":"g18","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":5001,"channel":"contactless"}
+{"id":"g19","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":4500,"channel":"contactless"}
+{"id":"g20","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":4500,"channel":"contactless"}
+{"id":"g21","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":4500,"channel":"contactless"}
+{"id":"g22","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":1500,"channel":"contactless"}
+{"id":"g23","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":1,"channel":"contactless"}
+# Channels accumulate separately; an SCA on either channel resets both
+{"id":"g24","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":2000,"channel":"remote"}
+{"id":"g25","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":2000,"channel":"contactless"}
+{"id":"g26","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":20000,"channel":"remote","traLowRisk":true}
+{"id":"g27","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":500,"channel":"remote"}
+{"id":"g28","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":26000,"channel":"remote","traLowRisk":true}
+# Trusted beneficiary (Art. 13): adding one needs SCA; later payments still count towards Art. 16
+{"id":"g29","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":8000,"channel":"remote","payee":"landlord","addPayeeToTrusted":true}
+{"id":"g30","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":90000,"channel":"remote","payee":"landlord"}
+{"id":"g31","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":500,"channel":"remote"}
+# Recurring (Art. 14): first and amended payments need SCA even where low-value would fit
+{"id":"g32","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":999,"channel":"remote","payee":"streaming","recurringSeriesId":"sub-1"}
+{"id":"g33","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":999,"channel":"remote","payee":"streaming","recurringSeriesId":"sub-1"}
+{"id":"g34","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":1299,"channel":"remote","payee":"streaming","recurringSeriesId":"sub-1"}
+{"id":"g35","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":1299,"channel":"remote","payee":"streaming","recurringSeriesId":"sub-1"}
+# A transaction-monitoring signal beats every exemption
+{"id":"g36","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":500,"channel":"remote","riskFlags":["malware"]}
+# Unattended transport terminal (Art. 12) has no amount ceiling
+{"id":"g37","instrument":"card-A","currency":"EUR","paymentType":"card","amountMinor":8000,"channel":"contactless","unattendedTerminal":"transport-fare"}
+# Own-account transfer (Art. 15); credit-transfer TRA needs its own fraud rate
+{"id":"g38","instrument":"acct-1","currency":"EUR","paymentType":"credit-transfer","amountMinor":500000,"channel":"remote","ownAccountTransfer":true}
+{"id":"g39","instrument":"acct-1","currency":"EUR","paymentType":"credit-transfer","amountMinor":15000,"channel":"remote","traLowRisk":true}
+# Accumulators are per instrument
+{"id":"g40","instrument":"card-B","currency":"EUR","paymentType":"card","amountMinor":2500,"channel":"remote"}

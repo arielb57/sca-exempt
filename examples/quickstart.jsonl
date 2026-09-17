@@ -1,0 +1,6 @@
+{"id":"t1","instrument":"card-9","currency":"EUR","paymentType":"card","amountMinor":2500,"channel":"remote"}
+{"id":"t2","instrument":"card-9","currency":"EUR","paymentType":"card","amountMinor":3000,"channel":"remote"}
+{"id":"t3","instrument":"card-9","currency":"EUR","paymentType":"card","amountMinor":3001,"channel":"remote"}
+{"id":"t4","instrument":"card-9","currency":"EUR","paymentType":"card","amountMinor":18000,"channel":"remote","traLowRisk":true}
+{"id":"t5","instrument":"card-9","currency":"EUR","paymentType":"card","amountMinor":999,"channel":"remote","payee":"streaming","recurringSeriesId":"sub-1"}
+{"id":"t6","instrument":"card-9","currency":"EUR","paymentType":"card","amountMinor":999,"channel":"remote","payee":"streaming","recurringSeriesId":"sub-1"}
