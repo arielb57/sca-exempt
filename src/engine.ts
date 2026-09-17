@@ -1,5 +1,5 @@
 import { formatEur, formatPpm } from "./money.js";
-import { ARTICLES, CONTACTLESS, LOW_VALUE, etvBandFor, type CumulativeLimit } from "./rules.js";
+import { ARTICLES, ATTEMPT_LIMIT, CONTACTLESS, LOW_VALUE, etvBandFor, type CumulativeLimit } from "./rules.js";
 import type {
   Accumulator,
   CounterMode,
@@ -7,7 +7,7 @@ import type {
   EngineConfig,
   EngineState,
   EvaluationResult,
-  ExemptionId,
+  PaymentExemptionId,
   InstrumentState,
   Rejection,
   Transaction,
@@ -22,7 +22,24 @@ export const EMPTY_INSTRUMENT: InstrumentState = {
   contactless: ZERO,
   trustedPayees: [],
   recurringSeries: {},
+  failedAttempts: 0,
 };
+
+/**
+ * Art. 4(3)(b): after five consecutive failed attempts the instrument is
+ * blocked, and no exemption brings it back — asking for SCA again is exactly
+ * what the article forbids. Returns undefined while the instrument is usable.
+ */
+export function blockedDecision(inst: InstrumentState, config: EngineConfig): Decision | undefined {
+  const limit = config.maxConsecutiveFailures ?? ATTEMPT_LIMIT.maxConsecutiveFailures;
+  if (limit === 0 || inst.failedAttempts < limit) return undefined;
+  return {
+    outcome: "blocked",
+    article: ARTICLES.attemptLimit,
+    detail: `${inst.failedAttempts} consecutive failed authentications reached the limit of ${limit}`,
+    failedAttempts: inst.failedAttempts,
+  };
+}
 
 export const DEFAULT_CONFIG: EngineConfig = { counterMode: "both", fraudRatePpm: {} };
 
@@ -32,7 +49,7 @@ export const DEFAULT_CONFIG: EngineConfig = { counterMode: "both", fraudRatePpm:
  * no amount ceiling first and Transaction Risk Analysis last, because TRA
  * volume is what Art. 20 audits against the reference fraud rate.
  */
-export const PRECEDENCE: readonly ExemptionId[] = [
+export const PRECEDENCE: readonly PaymentExemptionId[] = [
   "unattended-terminal",
   "own-account",
   "trusted-beneficiary",
@@ -59,6 +76,10 @@ export function evaluate(
 ): EvaluationResult {
   assertValid(txn);
   const inst = instrumentState(state, txn.instrument);
+
+  const blocked = blockedDecision(inst, config);
+  if (blocked) return { decision: blocked, executed: false, state };
+
   const decision = decide(txn, inst, config);
 
   if (decision.outcome === "exempt") {
@@ -68,10 +89,15 @@ export function evaluate(
   }
 
   if ((txn.scaOutcome ?? "success") === "failure") {
-    return { decision, executed: false, state };
+    // Art. 4(3)(b) counts attempts, so a failure is not a no-op even though
+    // the accumulators are untouched.
+    const failed: InstrumentState = { ...inst, failedAttempts: inst.failedAttempts + 1 };
+    return { decision, executed: false, state: withInstrument(state, txn.instrument, failed) };
   }
 
   const next: InstrumentState = {
+    ...inst,
+    failedAttempts: 0,
     remote: ZERO,
     contactless: ZERO,
     trustedPayees:
@@ -155,7 +181,7 @@ function mandatedSca(txn: Transaction, inst: InstrumentState): Decision | undefi
 type CheckResult = { applies: string; article: string } | Rejection;
 type Check = (txn: Transaction, inst: InstrumentState, config: EngineConfig) => CheckResult;
 
-const CHECKS: Readonly<Record<ExemptionId, Check>> = {
+const CHECKS: Readonly<Record<PaymentExemptionId, Check>> = {
   "unattended-terminal": (txn) => {
     if (txn.unattendedTerminal === undefined) {
       return out("unattended-terminal", "not-unattended", "not an unattended transport or parking terminal");
@@ -255,11 +281,11 @@ function cumulative(
   return { applies: parts.join(", "), article: limit.article };
 }
 
-function reject(exemption: ExemptionId, code: string, detail: string): Rejection {
+function reject(exemption: PaymentExemptionId, code: string, detail: string): Rejection {
   return { exemption, inScope: true, code, detail };
 }
 
-function out(exemption: ExemptionId, code: string, detail: string): Rejection {
+function out(exemption: PaymentExemptionId, code: string, detail: string): Rejection {
   return { exemption, inScope: false, code, detail };
 }
 
@@ -271,7 +297,7 @@ function accumulate(acc: Accumulator, amountMinor: number): Accumulator {
   };
 }
 
-function withInstrument(state: EngineState, instrument: string, next: InstrumentState): EngineState {
+export function withInstrument(state: EngineState, instrument: string, next: InstrumentState): EngineState {
   return { instruments: { ...state.instruments, [instrument]: next } };
 }
 

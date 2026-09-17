@@ -74,7 +74,9 @@ describe("golden replay", () => {
       s.txn.id,
       s.decision.outcome === "exempt"
         ? `exempt:${s.decision.exemption}`
-        : `${s.executed ? "sca" : "sca-failed"}:${s.decision.reason}`,
+        : s.decision.outcome === "blocked"
+          ? "blocked"
+          : `${s.executed ? "sca" : "sca-failed"}:${s.decision.reason}`,
       s.after.remote.cumulativeMinor,
       s.after.remote.count,
       s.after.contactless.cumulativeMinor,

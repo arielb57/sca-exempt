@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { PRECEDENCE, evaluate, replay, type Decision, type EngineConfig, type Transaction } from "../src/index.js";
-import { contactless, remote } from "./helpers.js";
+import { contactless, remote, asRejections, label } from "./helpers.js";
 
 const TRA: EngineConfig = { counterMode: "both", fraudRatePpm: { card: 0 } };
 
 function summary(d: Decision): string {
-  return d.outcome === "exempt" ? `exempt:${d.exemption}` : `sca:${d.reason}`;
+  return label(d);
 }
 
 function outcomes(...groups: Transaction[][]): string[] {
@@ -136,7 +136,7 @@ describe("engine precedence between exemptions", () => {
     );
     expect(steps[1]?.after.remote).toEqual({ cumulativeMinor: 9000, count: 1 });
     expect(summary(steps[2]!.decision)).toBe("sca:no-exemption-applies");
-    expect(steps[2]?.decision.rejected.find((r) => r.exemption === "low-value")?.code).toBe("cumulative-amount-exceeded");
+    expect(asRejections(steps[2]?.decision).find((r) => r.exemption === "low-value")?.code).toBe("cumulative-amount-exceeded");
   });
 
   it("own-account applies to credit transfers only; unattended terminals to point-of-sale only", () => {
@@ -144,9 +144,9 @@ describe("engine precedence between exemptions", () => {
     expect(summary(evaluate(ct).decision)).toBe("exempt:own-account");
     const card = evaluate(remote(900000, { ownAccountTransfer: true })).decision;
     expect(summary(card)).toBe("sca:no-exemption-applies");
-    expect(card.rejected.find((r) => r.exemption === "own-account")?.code).toBe("not-credit-transfer");
+    expect(asRejections(card).find((r) => r.exemption === "own-account")?.code).toBe("not-credit-transfer");
     const online = evaluate(remote(9000, { unattendedTerminal: "parking-fee" })).decision;
-    expect(online.rejected.find((r) => r.exemption === "unattended-terminal")?.code).toBe("remote");
+    expect(asRejections(online).find((r) => r.exemption === "unattended-terminal")?.code).toBe("remote");
   });
 
   it("a disabled exemption is skipped and the next one in order is tried", () => {

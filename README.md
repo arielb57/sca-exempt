@@ -22,6 +22,7 @@ evaluate(transaction, state, config) -> { decision, executed, state' }
 
 ### The decision, in order
 
+0. **Blocked instrument.** Art. 4(3)(b) caps consecutive failed authentications at five. Once an instrument reaches the cap nothing is evaluated: the outcome is `blocked`, and asking for SCA again is precisely what the article forbids. A passed SCA clears it.
 1. **Mandated SCA.** These are checked first and win over any exemption:
    - a transaction-monitoring risk flag (Art. 2, Art. 18(2)(c)(i)-(vi));
    - adding a payee to the trusted-beneficiary list (Art. 13);
@@ -39,6 +40,23 @@ evaluate(transaction, state, config) -> { decision, executed, state' }
    | 7 | `tra` | Art. 18 | remote, classified low risk, amount ≤ ETV for the PSP's fraud rate |
 
 3. If nothing applies, SCA is required (`no-exemption-applies`). The detail lists every exemption that was in scope and the comparison that ruled it out.
+
+### Article 10: looking at the account rather than paying out of it
+
+`evaluateAccess` answers the other question the RTS poses — when a bank may show you your balance without asking for a code.
+
+```ts
+import { evaluateAccess } from "sca-exempt";
+
+evaluateAccess({ id: "a1", instrument: "acct-9", at: "2026-01-01", scope: "balance" });
+// sca-required, reason "first-access"  (Art. 10(2)(b))
+```
+
+Art. 10(1) covers the balance and the transactions of the last 90 days, and only without disclosure of sensitive payment data. Art. 10(2) makes that conditional on SCA for the first access and on no more than 90 days since the last one. Three readings had to be settled, all in the same strict direction as the payment rules:
+
+- **Only an authenticated access restarts the 90 days.** The article measures from the last access at which SCA *was applied*, so an exempt look does not push the deadline back. The practical consequence is worth knowing: the challenge comes round at least every 90 days however often you open the app.
+- **A payment SCA does not restart it either.** Passing SCA to buy something is not accessing account information.
+- **Day 90 is inside the window, day 91 is not.** The article says "more than 90 days have elapsed".
 
 ### The state machine
 
@@ -185,10 +203,9 @@ Each choice is one line in `src/engine.ts` and is pinned by a test, so a PSP who
 - **EUR only.** Payments in other currencies are rejected rather than converted, since the RTS limits are in euros and conversion is a policy decision.
 - **Rates are inputs.** The engine does not compute the Art. 19 rolling fraud rate or do the real-time risk analysis. It takes the rate and a `traLowRisk` classification from the PSP.
 - **No per-actor liability model.** It does not model who applies the exemption (issuer or acquirer), liability shift, merchant-initiated transactions, one-leg-out transactions, or corporate payments (Art. 17).
-- **No blocking after failed attempts.** It does not track Art. 4(3)(d) failed-authentication blocking or Art. 4(3)(e) session timeouts. A failed SCA simply declines that payment.
-- **Art. 10 not covered.** Account-information access is out of scope.
+- **Art. 4(3)(e) session timeouts are not modelled.** The five-minute inactivity limit is about the authenticated session, not about a payment decision, so nothing here observes it.
 - **Trusted payees are never removed.** There is no event for removing a payee or cancelling a recurring series.
-- **Time is not modelled.** Payments are processed in stream order, and there is no timestamp-based reset.
+- **Payments are still untimed.** Account access carries a timestamp, because Art. 10 is a 90-day rule, but payments are processed in stream order alone. Nothing expires a contactless accumulator after a day, or a trusted beneficiary after a year.
 - **Not legal advice.** The interpretations in *Design notes* are defensible, strict readings, and national competent authorities or scheme rules may differ.
 
 ## License

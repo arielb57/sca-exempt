@@ -7,7 +7,7 @@ import {
   type EngineConfig,
   type Transaction,
 } from "../src/index.js";
-import { contactless, remote } from "./helpers.js";
+import { contactless, remote, asRejections } from "./helpers.js";
 
 function lastOf(txns: Transaction[], config: EngineConfig = DEFAULT_CONFIG) {
   const { steps } = replay(txns, config);
@@ -25,7 +25,7 @@ describe("low-value single-amount boundary (Art. 16(a): does not exceed EUR 30)"
     const { decision } = evaluate(remote(amount));
     expect(decision.outcome).toBe(outcome);
     if (decision.outcome === "sca-required") {
-      expect(decision.rejected.find((r) => r.exemption === "low-value")?.code).toBe("amount-above-limit");
+      expect(asRejections(decision).find((r) => r.exemption === "low-value")?.code).toBe("amount-above-limit");
     }
   });
 });
@@ -42,7 +42,7 @@ describe("low-value cumulative boundary (Art. 16(b): EUR 100 including the new p
     });
     expect(step.decision.outcome).toBe(outcome);
     if (outcome === "sca-required") {
-      expect(step.decision.rejected.find((r) => r.exemption === "low-value")?.code).toBe("cumulative-amount-exceeded");
+      expect(asRejections(step.decision).find((r) => r.exemption === "low-value")?.code).toBe("cumulative-amount-exceeded");
     }
   });
 });
@@ -63,7 +63,7 @@ describe("consecutive count boundary (5th vs 6th payment since last SCA)", () =>
         "sca-required",
       ]);
       expect(steps[4]?.after[label].count).toBe(5);
-      expect(steps[5]?.decision.rejected.find((r) => r.inScope)?.code).toBe("consecutive-count-exceeded");
+      expect(asRejections(steps[5]?.decision).find((r) => r.inScope)?.code).toBe("consecutive-count-exceeded");
       expect(steps[5]?.after[label]).toEqual({ cumulativeMinor: 0, count: 0 });
     });
   }
@@ -82,9 +82,9 @@ describe("consecutive count boundary (5th vs 6th payment since last SCA)", () =>
   it("both mode stops at whichever limit is reached first", () => {
     const both: EngineConfig = { counterMode: "both", fraudRatePpm: {} };
     const byAmount = lastOf([remote(3000), remote(3000), remote(3000), remote(1001)], both);
-    expect(byAmount.decision.rejected.find((r) => r.exemption === "low-value")?.code).toBe("cumulative-amount-exceeded");
+    expect(asRejections(byAmount.decision).find((r) => r.exemption === "low-value")?.code).toBe("cumulative-amount-exceeded");
     const byCount = lastOf(Array.from({ length: 6 }, () => remote(1)), both);
-    expect(byCount.decision.rejected.find((r) => r.exemption === "low-value")?.code).toBe("consecutive-count-exceeded");
+    expect(asRejections(byCount.decision).find((r) => r.exemption === "low-value")?.code).toBe("consecutive-count-exceeded");
   });
 });
 
@@ -145,12 +145,12 @@ describe("TRA exemption threshold values (Art. 18 and Annex)", () => {
   it("requires a low-risk classification from real-time risk analysis", () => {
     const { decision } = evaluate(remote(5_000), EMPTY_STATE, cfg(0));
     expect(decision.outcome).toBe("sca-required");
-    expect(decision.rejected.find((r) => r.exemption === "tra")?.code).toBe("not-low-risk");
+    expect(asRejections(decision).find((r) => r.exemption === "tra")?.code).toBe("not-low-risk");
   });
 
   it("never applies to contactless payments", () => {
     const { decision } = evaluate(contactless(6_000, { traLowRisk: true }), EMPTY_STATE, cfg(0));
     expect(decision.outcome).toBe("sca-required");
-    expect(decision.rejected.find((r) => r.exemption === "tra")?.inScope).toBe(false);
+    expect(asRejections(decision).find((r) => r.exemption === "tra")?.inScope).toBe(false);
   });
 });

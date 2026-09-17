@@ -61,7 +61,29 @@ export const ARTICLES = {
   contactless: CONTACTLESS.article,
   lowValue: LOW_VALUE.article,
   tra: "RTS Art. 18",
+  accountInformation: "RTS Art. 10",
+  attemptLimit: "RTS Art. 4(3)(b)",
   sca: "PSD2 Art. 97(1), RTS Art. 4",
+} as const;
+
+/**
+ * Art. 10(2)(b): account information may skip SCA only if SCA was applied for
+ * the first access and no more than 90 days have passed since the last one.
+ */
+export const ACCOUNT_INFORMATION = {
+  article: "RTS Art. 10",
+  scaValidityDays: 90,
+} as const;
+
+/**
+ * Art. 4(3)(b): "the number of failed authentication attempts that can take
+ * place consecutively ... shall not exceed five within a given period of
+ * time". The period is left to the PSP; this engine counts consecutively and
+ * resets on a success, which is the reading that blocks soonest.
+ */
+export const ATTEMPT_LIMIT = {
+  article: "RTS Art. 4(3)(b)",
+  maxConsecutiveFailures: 5,
 } as const;
 
 /**

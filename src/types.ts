@@ -47,6 +47,27 @@ export interface InstrumentState {
   readonly contactless: Accumulator;
   readonly trustedPayees: readonly string[];
   readonly recurringSeries: Readonly<Record<string, { readonly payee: string; readonly amountMinor: number }>>;
+  /** Art. 4(3)(b): consecutive failed SCA attempts. A success resets it to 0. */
+  readonly failedAttempts: number;
+  /** Art. 10(2)(b): when SCA was last applied to an account-information access. */
+  readonly lastAccessScaAt?: string;
+}
+
+/**
+ * Art. 10: the payer looking at their own account rather than paying.
+ *
+ * ``scope`` decides whether Art. 10 can cover the access at all. The article
+ * covers the balance and the transactions of the last 90 days, and only
+ * "without disclosure of sensitive payment data".
+ */
+export interface AccountAccess {
+  readonly id: string;
+  readonly instrument: string;
+  /** ISO-8601 date or date-time. The 90-day window is measured from this. */
+  readonly at: string;
+  readonly scope: "balance" | "recent-transactions" | "older-transactions" | "sensitive-payment-data";
+  /** What happens if SCA is requested. Defaults to "success". */
+  readonly scaOutcome?: "success" | "failure";
 }
 
 export interface EngineState {
@@ -59,7 +80,8 @@ export interface EngineState {
  */
 export type CounterMode = "amount" | "count" | "both";
 
-export type ExemptionId =
+/** The exemptions a *payment* can take, in the order the engine tries them. */
+export type PaymentExemptionId =
   | "unattended-terminal"
   | "own-account"
   | "trusted-beneficiary"
@@ -68,16 +90,26 @@ export type ExemptionId =
   | "low-value"
   | "tra";
 
+/**
+ * Art. 10 is an exemption too, but it applies to looking at an account rather
+ * than paying out of it, so it is never a candidate in the payment chain.
+ */
+export type ExemptionId = PaymentExemptionId | "account-information";
+
 export interface EngineConfig {
   readonly counterMode: CounterMode;
+  /** Art. 4(3)(b), default 5. Zero disables blocking. */
+  readonly maxConsecutiveFailures?: number;
+  /** Art. 10(2)(b), default 90. */
+  readonly accessScaValidityDays?: number;
   /** The PSP's rolling fraud rate per payment type (Art. 19), in ppm. Absent: TRA unavailable. */
   readonly fraudRatePpm: Readonly<Partial<Record<PaymentType, number>>>;
-  /** Exemptions the PSP has chosen to apply. Absent: all. */
-  readonly enabledExemptions?: readonly ExemptionId[];
+  /** Payment exemptions the PSP has chosen to apply. Absent: all. */
+  readonly enabledExemptions?: readonly PaymentExemptionId[];
 }
 
 export interface Rejection {
-  readonly exemption: ExemptionId;
+  readonly exemption: PaymentExemptionId;
   /** False when the exemption's scope does not cover this transaction at all. */
   readonly inScope: boolean;
   readonly code: string;
@@ -85,6 +117,9 @@ export interface Rejection {
 }
 
 export type ScaReason =
+  | "first-access"
+  | "access-sca-expired"
+  | "out-of-article-10-scope"
   | "risk-signal"
   | "trusted-beneficiary-list-change"
   | "recurring-series-created"
@@ -92,6 +127,12 @@ export type ScaReason =
   | "no-exemption-applies";
 
 export type Decision =
+  | {
+      readonly outcome: "blocked";
+      readonly article: string;
+      readonly detail: string;
+      readonly failedAttempts: number;
+    }
   | {
       readonly outcome: "exempt";
       readonly exemption: ExemptionId;
@@ -111,5 +152,12 @@ export interface EvaluationResult {
   readonly decision: Decision;
   /** Whether the payment went through: exempt, or SCA requested and passed. */
   readonly executed: boolean;
+  readonly state: EngineState;
+}
+
+export interface AccessResult {
+  readonly decision: Decision;
+  /** Whether the information was disclosed. */
+  readonly granted: boolean;
   readonly state: EngineState;
 }

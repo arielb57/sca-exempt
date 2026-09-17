@@ -5,6 +5,7 @@ import {
   LOW_VALUE,
   etvBandFor,
   evaluate,
+  instrumentState,
   replay,
   type CounterMode,
   type EngineConfig,
@@ -50,6 +51,19 @@ function oracle(txns: readonly Transaction[], config: EngineConfig): string[] {
   const out: string[] = [];
   for (const txn of txns) {
     const mine = history.filter((h) => h.txn.instrument === txn.instrument);
+
+    // Art. 4(3)(b) counts consecutive failed *authentication attempts*. An
+    // exempt payment is not an attempt, so it does not break the run: only a
+    // passed SCA does. Five in a row block the instrument, and nothing after
+    // that is evaluated at all.
+    const attempts = mine.filter((h) => h.kind !== "exempt");
+    let consecutive = 0;
+    for (let i = attempts.length - 1; i >= 0 && attempts[i]?.kind === "sca-fail"; i -= 1) consecutive += 1;
+    if (consecutive >= 5) {
+      out.push("blocked");
+      continue;
+    }
+
     const lastSca = mine.map((h) => h.kind).lastIndexOf("sca-ok");
     const since = mine.slice(lastSca + 1).filter((h) => h.kind === "exempt" && h.txn.channel === txn.channel);
     const sum = since.reduce((a, h) => a + h.txn.amountMinor, 0) + txn.amountMinor;
@@ -87,8 +101,15 @@ describe("stateful properties over random transaction sequences", () => {
   it("matches an oracle that recomputes every decision from raw history", () => {
     fc.assert(
       fc.property(fc.array(txnArb, { maxLength: 60, size: "max" }), configArb, (txns, config) => {
+        // "blocked" is kept distinct from "sca": collapsing them would hide
+        // the Art. 4(3)(b) limit from the one test that compares against an
+        // independent recomputation.
         const got = replay(txns, config).steps.map((s) =>
-          s.decision.outcome === "exempt" ? `exempt:${s.decision.exemption}` : "sca",
+          s.decision.outcome === "exempt"
+            ? `exempt:${s.decision.exemption}`
+            : s.decision.outcome === "blocked"
+              ? "blocked"
+              : "sca",
         );
         expect(got).toEqual(oracle(txns, config));
       }),
@@ -117,17 +138,31 @@ describe("stateful properties over random transaction sequences", () => {
     );
   });
 
-  it("a failed SCA leaves the whole state unchanged and the payment unexecuted", () => {
+  it("a failed SCA leaves the accumulators alone but counts towards the attempt limit", () => {
     fc.assert(
       fc.property(fc.array(txnArb, { maxLength: 40, size: "max" }), configArb, (txns, config) => {
         let state: EngineState = EMPTY_STATE;
         for (const txn of txns) {
+          const before = instrumentState(state, txn.instrument);
           const result = evaluate(txn, state, config);
-          if (result.decision.outcome === "sca-required") {
+          const after = instrumentState(result.state, txn.instrument);
+
+          if (result.decision.outcome === "blocked") {
+            expect(result.executed).toBe(false);
+            expect(result.state).toBe(state);
+          } else if (result.decision.outcome === "sca-required") {
             expect(result.executed).toBe(txn.scaOutcome !== "failure");
-            if (txn.scaOutcome === "failure") expect(result.state).toBe(state);
+            if (txn.scaOutcome === "failure") {
+              // Art. 4(3)(b) makes a failure count, so the state is not
+              // untouched — but nothing an exemption reads may move.
+              expect(after.failedAttempts).toBe(before.failedAttempts + 1);
+              expect({ ...after, failedAttempts: 0 }).toEqual({ ...before, failedAttempts: 0 });
+            } else {
+              expect(after.failedAttempts).toBe(0);
+            }
           } else {
             expect(result.executed).toBe(true);
+            expect(after.failedAttempts).toBe(before.failedAttempts);
           }
           state = result.state;
         }

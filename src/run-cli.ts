@@ -116,7 +116,11 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
             id: txn.id,
             instrument: txn.instrument,
             outcome: d.outcome,
-            ...(d.outcome === "exempt" ? { exemption: d.exemption } : { reason: d.reason }),
+            ...(d.outcome === "exempt"
+              ? { exemption: d.exemption }
+              : d.outcome === "blocked"
+                ? { failedAttempts: d.failedAttempts }
+                : { reason: d.reason }),
             article: d.article,
             detail: d.detail,
             executed: result.executed,
@@ -125,7 +129,11 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
         );
       } else {
         const label =
-          d.outcome === "exempt" ? `EXEMPT ${d.exemption}` : `${result.executed ? "SCA" : "SCA-FAILED"} ${d.reason}`;
+          d.outcome === "exempt"
+            ? `EXEMPT ${d.exemption}`
+            : d.outcome === "blocked"
+              ? `BLOCKED after ${String(d.failedAttempts)} failed attempts`
+              : `${result.executed ? "SCA" : "SCA-FAILED"} ${d.reason}`;
         const tail = inst ? ` | ${counters(inst)}` : "";
         io.stdout.write(
           `${txn.id} ${txn.instrument} ${formatEur(txn.amountMinor)} ${txn.channel}: ${label} (${d.article}) ${d.detail}${tail}\n`,
