@@ -1,0 +1,43 @@
+{
+  "name": "sca-exempt",
+  "version": "0.1.0",
+  "description": "A PSD2 Strong Customer Authentication exemption engine that says when SCA can be skipped, and why.",
+  "license": "MIT",
+  "author": "Ariel Belhamou",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "sca-exempt": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "examples"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint . && tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "psd2",
+    "sca",
+    "strong-customer-authentication",
+    "rts",
+    "payments",
+    "exemptions"
+  ],
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "22.20.3",
+    "eslint": "9.39.5",
+    "fast-check": "4.10.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "3.2.7"
+  }
+}
