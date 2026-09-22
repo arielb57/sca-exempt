@@ -171,7 +171,7 @@ Store `state` between calls; the engine keeps nothing internally.
 
 ## Results
 
-The engine makes no performance claim, so there is no benchmark. Correctness is backed by 93 tests (`npm test`, about 1 second):
+The engine makes no performance claim, so there is no benchmark. Correctness is backed by 105 tests (`npm test`, about 1 second):
 
 - **Counter-reset invariant (property, fast-check):** over random multi-instrument sequences, every successful SCA zeroes both accumulators of that instrument and leaves other instruments untouched. A failed SCA returns the identical state object.
 - **Oracle model (property):** a second implementation recomputes every decision from the raw history instead of running counters, with the RTS numbers written out literally. It must agree with the engine on every step, in all three counter modes, with and without TRA.
